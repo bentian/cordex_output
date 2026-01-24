@@ -2,33 +2,77 @@
 set -euo pipefail
 
 # -------------------------
-# CONFIG
-# -------------------------
-TRAINING_GCM="CNRM-CM5"
-OUT_OF_SAMPLE_GCM="MPI-ESM-LR"
-
-SRC_PRED="output_0_all.nc"
-SRC_CFG="hydra_generate/config.yaml"
-
-# -------------------------
 # ARGUMENTS
 # -------------------------
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <input_dir> <output_dir>"
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 <DOMAIN:{ALPS|NZ|SA}> <SRC_TOP_DIR> <DST_TOP_DIR>"
   exit 1
 fi
 
-IN_DIR="$1"
-OUT_DIR="$2"
-
-# Copy training metadata
-# mkdir -p "$OUT_DIR/training"
-# cp -r "$IN_DIR"/hydra_train/config.yaml "$IN_DIR"/tensorboard_* "$OUT_DIR/training/"
+DOMAIN="$1"
+SRC_TOP_DIR="$2"
+DST_TOP_DIR="$3"
 
 # -------------------------
-# MAPPINGS
-# format:
-# TID | out_subdir | gcm | period
+# DOMAIN → GCM CONFIG
+# -------------------------
+case "$DOMAIN" in
+  ALPS)
+    TRAINING_GCM="CNRM-CM5"
+    OUT_OF_SAMPLE_GCM="MPI-ESM-LR"
+    ;;
+  SA)
+    TRAINING_GCM="ACCESS-CM2"
+    OUT_OF_SAMPLE_GCM="NorESM2-MM"
+    ;;
+  NZ)
+    TRAINING_GCM="ACCESS-CM2"
+    OUT_OF_SAMPLE_GCM="EC-Earth3"
+    ;;
+  *)
+    echo "Invalid DOMAIN: $DOMAIN (must be ALPS, NZ, or SA)" >&2
+    exit 1
+    ;;
+esac
+
+SRC_PRED="output_0_all.nc"
+
+# -------------------------
+# DOMAIN → MODELS
+# -------------------------
+case "$DOMAIN" in
+  ALPS)
+    MODELS=(A1 A1o A2 A2o)
+    # MODELS=(A2o)
+    ;;
+  NZ)
+    MODELS=(N1 N1o N2 N2o)
+    ;;
+  SA)
+    MODELS=(S1 S1o S2 S2o)
+    ;;
+  *)
+    echo "Invalid DOMAIN: $DOMAIN (must be ALPS, NZ, or SA)" >&2
+    exit 1
+    ;;
+esac
+
+DST_DOMAIN_DIR="${DOMAIN}_domain"
+
+# -------------------------
+# MODEL → DST SUBFOLDER (DST only)
+# -------------------------
+model_subdir() {
+  case "$1" in
+    *1)  echo "$DST_DOMAIN_DIR/ESD_pseudo_reality" ;;
+    *1o) echo "$DST_DOMAIN_DIR/ESD_pseudo_reality_OROG" ;;
+    *2)  echo "$DST_DOMAIN_DIR/Emulator_hist_future" ;;
+    *2o) echo "$DST_DOMAIN_DIR/Emulator_hist_future_OROG" ;;
+  esac
+}
+
+# -------------------------
+# TID → OUTPUT MAPPINGS
 # -------------------------
 MAPPINGS=(
   "T1|predictions/historical/perfect|$TRAINING_GCM|1981-2000"
@@ -47,34 +91,27 @@ MAPPINGS=(
 )
 
 # -------------------------
-# COPY LOOP
+# MAIN LOOP
 # -------------------------
-for entry in "${MAPPINGS[@]}"; do
-  IFS="|" read -r TID OUT_SUBDIR GCM PERIOD <<< "$entry"
+for model in "${MODELS[@]}"; do
+  IN_MODEL_DIR="${SRC_TOP_DIR%/}/$model"
+  OUT_MODEL_DIR="${DST_TOP_DIR%/}/$(model_subdir "$model")"
 
-  SRC_PRED_PATH="${IN_DIR}/${TID}/${SRC_PRED}"
-  SRC_CFG_PATH="${IN_DIR}/${TID}/${SRC_CFG}"
+  for entry in "${MAPPINGS[@]}"; do
+    IFS="|" read -r TID OUT_SUBDIR GCM PERIOD <<< "$entry"
 
-  DST_DIR="${OUT_DIR}/${OUT_SUBDIR}"
-  DST_PRED="Predictions_pr_tasmax_${GCM}_${PERIOD}.nc"
-  DST_CFG="config_${GCM}.yaml"
+    SRC_PRED_PATH="${IN_MODEL_DIR}/${TID}/${SRC_PRED}"
+    DST_DIR="${OUT_MODEL_DIR}/${OUT_SUBDIR}"
+    DST_PRED="Predictions_pr_tasmax_${GCM}_${PERIOD}.nc"
 
-  mkdir -p "$DST_DIR"
+    mkdir -p "$DST_DIR"
 
-  # prediction file
-  if [ -f "$SRC_PRED_PATH" ]; then
-    cp -p "$SRC_PRED_PATH" "$DST_DIR/$DST_PRED"
-    echo "[OK] $SRC_PRED_PATH → $DST_DIR/$DST_PRED"
-  else
-    echo "[SKIP] Missing prediction: $SRC_PRED_PATH"
-  fi
-
-  # hydra config
-  # if [ -f "$SRC_CFG_PATH" ]; then
-  #  cp -p "$SRC_CFG_PATH" "$DST_DIR/$DST_CFG"
-  #  echo "[OK] $SRC_CFG_PATH → $DST_DIR/$DST_CFG"
-  # else
-  #  echo "[SKIP] Missing config: $SRC_CFG_PATH"
-  # fi
+    if [[ -f "$SRC_PRED_PATH" ]]; then
+      python convert_nc.py "$DOMAIN" "$SRC_PRED_PATH" "$DST_DIR/$DST_PRED"
+      echo "[OK] ($DOMAIN/$model/$TID) → $DST_DIR/$DST_PRED"
+    else
+      echo "[SKIP] ($DOMAIN/$model/$TID) Missing: $SRC_PRED_PATH"
+    fi
+  done
 done
 

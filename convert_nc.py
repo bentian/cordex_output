@@ -61,9 +61,7 @@ def convert_predictions_keep_ensemble(
     OUTPUT:
       /prediction/pr(ensemble,time,y,x) and /prediction/tasmax(ensemble,time,y,x)
       with TEMPLATE attrs (except template doesn't have ensemble; we keep it).
-      Also overwrite root time/lat/lon/x/y to match template variables + attrs.
-
-    Keeps ALL other groups/vars (e.g., /input, other /prediction vars if any).
+      Also overwrite root lat/lon/x/y to match template variables + attrs.
     """
 
     with xr.open_dataset(tpl_pr_nc) as tpl_pr, \
@@ -85,16 +83,8 @@ def convert_predictions_keep_ensemble(
 
         out_pred = out_pred.drop_vars([src_pr_name, src_tasmax_name])
 
-        # --- Write output, preserving groups ---
-        # 1) write root
-        # out_root.to_netcdf(out_nc, mode="w")
-
-        # 2) write prediction group
-        # out_pred.to_netcdf(out_nc, mode="a", group=src_pred_group)
+        # --- Write output ---
         out_pred.to_netcdf(out_nc, mode="w")
-
-        # 3) write input group unchanged
-        # src_inp.to_netcdf(out_nc, mode="a", group="input")
 
 
 if __name__ == "__main__":
@@ -113,4 +103,4 @@ if __name__ == "__main__":
         out_nc=out_nc,
     )
 
-    print(f"Wrote: {out_nc} for {domain}")
+    # print(f"Wrote: {out_nc} for {domain}")
