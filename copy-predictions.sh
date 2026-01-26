@@ -42,8 +42,8 @@ SRC_PRED="output_0_all.nc"
 # -------------------------
 case "$DOMAIN" in
   ALPS)
-    MODELS=(A1 A1o A2 A2o)
-    # MODELS=(A2 A2o)
+    # MODELS=(A1 A1o A2 A2o)
+    MODELS=(A2 A2o)
     ;;
   NZ)
     MODELS=(N1 N1o N2 N2o)
@@ -57,8 +57,8 @@ case "$DOMAIN" in
     ;;
 esac
 
-DST_DOMAIN_DIR="NO_OROG/${DOMAIN}_domain"
-DST_DOMAIN_DIR_OROG="OROG/${DOMAIN}_domain"
+DST_DOMAIN_DIR="NO_OROG/${DOMAIN}_Domain"
+DST_DOMAIN_DIR_OROG="OROG/${DOMAIN}_Domain"
 
 # -------------------------
 # MODEL → DST SUBFOLDER (DST only)
@@ -76,19 +76,19 @@ model_subdir() {
 # TID → OUTPUT MAPPINGS
 # -------------------------
 MAPPINGS=(
-  "T1|predictions/historical/perfect|$TRAINING_GCM|1981-2000"
-  "T2|predictions/mid_century/perfect|$TRAINING_GCM|2041-2060"
-  "T3|predictions/end_century/perfect|$TRAINING_GCM|2080-2099"
-  # "T4|predictions/historical/perfect|$OUT_OF_SAMPLE_GCM|1981-2000"
-  "T5|predictions/mid_century/perfect|$OUT_OF_SAMPLE_GCM|2041-2060"
-  "T6|predictions/end_century/perfect|$OUT_OF_SAMPLE_GCM|2080-2099"
+  "T1|historical/perfect|$TRAINING_GCM|1981-2000"
+  "T2|mid_century/perfect|$TRAINING_GCM|2041-2060"
+  "T3|end_century/perfect|$TRAINING_GCM|2080-2099"
+  # "T4|historical/perfect|$OUT_OF_SAMPLE_GCM|1981-2000"
+  "T5|mid_century/perfect|$OUT_OF_SAMPLE_GCM|2041-2060"
+  "T6|end_century/perfect|$OUT_OF_SAMPLE_GCM|2080-2099"
 
-  "T7|predictions/historical/imperfect|$TRAINING_GCM|1981-2000"
-  "T8|predictions/mid_century/imperfect|$TRAINING_GCM|2041-2060"
-  "T9|predictions/end_century/imperfect|$TRAINING_GCM|2080-2099"
-  # "T10|predictions/historical/imperfect|$OUT_OF_SAMPLE_GCM|1981-2000"
-  "T11|predictions/mid_century/imperfect|$OUT_OF_SAMPLE_GCM|2041-2060"
-  # "T12|predictions/end_century/imperfect|$OUT_OF_SAMPLE_GCM|2080-2099"
+  "T7|historical/imperfect|$TRAINING_GCM|1981-2000"
+  "T8|mid_century/imperfect|$TRAINING_GCM|2041-2060"
+  "T9|end_century/imperfect|$TRAINING_GCM|2080-2099"
+  # "T10|historical/imperfect|$OUT_OF_SAMPLE_GCM|1981-2000"
+  "T11|mid_century/imperfect|$OUT_OF_SAMPLE_GCM|2041-2060"
+  # "T12|end_century/imperfect|$OUT_OF_SAMPLE_GCM|2080-2099"
 )
 
 # -------------------------
