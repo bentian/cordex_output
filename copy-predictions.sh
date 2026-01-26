@@ -57,8 +57,8 @@ case "$DOMAIN" in
     ;;
 esac
 
-DST_DOMAIN_DIR="${DOMAIN}_domain"
-DST_DOMAIN_DIR_OROG="${DOMAIN}_domain_OROG"
+DST_DOMAIN_DIR="NO_OROG/${DOMAIN}_domain"
+DST_DOMAIN_DIR_OROG="OROG/${DOMAIN}_domain"
 
 # -------------------------
 # MODEL → DST SUBFOLDER (DST only)
