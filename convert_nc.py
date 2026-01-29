@@ -33,8 +33,8 @@ def _force_replace_vars(dst: xr.Dataset, tpl: xr.Dataset, names=GRID_TIME_VARS) 
     return dst
 
 
-def _make_var(src, name, tpl, root):
-    da = src.astype(np.float32).rename(name)
+def _make_var(src, name, tpl, root, *, mean=0.0, scale=1.0):
+    da = (src * scale + mean).astype(np.float32).rename(name)
     da.attrs = dict(tpl.attrs)
     if "lat" in root and "lon" in root:
         da = da.assign_coords(lat=root["lat"], lon=root["lon"])
@@ -42,9 +42,8 @@ def _make_var(src, name, tpl, root):
 
 
 def convert_predictions_keep_ensemble(
+    model: str,
     src_nc: str,
-    tpl_pr_nc: str,
-    tpl_tasmax_nc: str,
     out_nc: str,
     *,
     src_pr_name: str = "precipitation",
@@ -63,6 +62,35 @@ def convert_predictions_keep_ensemble(
       with TEMPLATE attrs (except template doesn't have ensemble; we keep it).
       Also overwrite root lat/lon/x/y to match template variables + attrs.
     """
+    # per-model normalization params (fill yours in)
+    MEAN = {
+        "A1": {"pr": 3.0094404220581055, "tasmax": 287.3564147949219},
+        "A2": {"pr": 3.023773670196533, "tasmax": 289.5425720214844},
+        "S1": {"pr": 3.1895868716998854, "tasmax": 295.9818420410156},
+        "S2": {"pr": 3.197072799236965, "tasmax": 298.7344055175781},
+        "N1": {"pr": 3.3502800487977384, "tasmax": 287.85821533203125},
+        "N2": {"pr": 3.4224649266576477, "tasmax": 289.825439453125},
+    }
+    SCALE = {
+        "A1": {"pr": 7.059685707092285, "tasmax": 8.284003257751465},
+        "A2": {"pr": 7.377854824066162, "tasmax": 8.576455116271973},
+        "S1": {"pr": 9.934561096786277, "tasmax": 6.739269256591797},
+        "S2": {"pr": 11.157043537049379, "tasmax": 7.496180534362793},
+        "N1": {"pr": 8.695985226126469, "tasmax": 3.914102077484131},
+        "N2": {"pr": 9.727775223067006, "tasmax": 4.607882022857666},
+    }
+
+    def ms(model: str, var: str):
+        ds_idx = model.rstrip("o")
+        return MEAN.get(ds_idx, {}).get(var, 0.0), SCALE.get(ds_idx, {}).get(var, 1.0)
+
+    # model -> domain
+    DOMAIN_BY_PREFIX = {"A": "ALPS", "S": "SA", "N": "NZ"}
+    domain = DOMAIN_BY_PREFIX[model[0]]  # model like "A1", "S3", "N2"
+
+    tpl_pr_nc=f"./templates/pr_{domain}.nc",
+    tpl_tasmax_nc=f"./templates/tasmax_{domain}.nc"
+    print(tpl_pr_nc, tpl_tasmax_nc)
 
     with xr.open_dataset(tpl_pr_nc) as tpl_pr, \
         xr.open_dataset(tpl_tasmax_nc) as tpl_ta, \
@@ -77,9 +105,14 @@ def convert_predictions_keep_ensemble(
         # --- Build new prediction group dataset (preserve everything, add/rename vars) ---
         out_pred = src_pred.copy(deep=False).rename({"ensemble": "member"})
 
-        pr_ens = _make_var(out_pred[src_pr_name], "pr", tpl_pr["pr"], out_root)
-        ta_ens = _make_var(out_pred[src_tasmax_name], "tasmax", tpl_ta["tasmax"], out_root)
-        out_pred.update({"pr": pr_ens, "tasmax": ta_ens})
+        for var, src_name, tpl in [
+            ("pr", src_pr_name, tpl_pr["pr"]),
+            ("tasmax", src_tasmax_name, tpl_ta["tasmax"]),
+        ]:
+            print(*ms(model, var))
+            out_pred[var] = _make_var(
+                out_pred[src_name], var, tpl, out_root, *ms(model, var)
+            )
 
         out_pred = out_pred.drop_vars([src_pr_name, src_tasmax_name])
 
@@ -92,14 +125,13 @@ if __name__ == "__main__":
         print("Usage: python convert_nc.py <domain> <src_file.nc> <dst_file.nc>")
         sys.exit(1)
 
-    domain = sys.argv[1]
+    model = sys.argv[1]
     src_nc = sys.argv[2]
     out_nc = sys.argv[3]
 
     convert_predictions_keep_ensemble(
+        model=model,
         src_nc=src_nc,
-        tpl_pr_nc=f"./templates/pr_{domain}.nc",
-        tpl_tasmax_nc=f"./templates/tasmax_{domain}.nc",
         out_nc=out_nc,
     )
 
