@@ -72,19 +72,6 @@ def convert_predictions_keep_ensemble(
     src_pr_name: str = "precipitation",
     src_tasmax_name: str = "max_surface_temperature"
 ):
-    """
-    Convert SOURCE prediction variables into template-style variable names/attrs,
-    but KEEP ensemble dimension.
-
-    SOURCE:
-      /prediction/precipitation(ensemble,time,y,x)
-      /prediction/max_surface_temperature(ensemble,time,y,x)
-
-    OUTPUT:
-      /prediction/pr(ensemble,time,y,x) and /prediction/tasmax(ensemble,time,y,x)
-      with TEMPLATE attrs (except template doesn't have ensemble; we keep it).
-      Also overwrite root lat/lon/x/y to match template variables + attrs.
-    """
     # per-model normalization params
     MEAN = {
         "A1": {"pr": 3.0094404220581055, "tasmax": 287.3564147949219},
@@ -124,8 +111,13 @@ def convert_predictions_keep_ensemble(
         out_root = _force_replace_vars(out_root, tpl_pr)
         out_root = _force_replace_vars(out_root, tpl_ta)
 
-        # --- Build new prediction group dataset (preserve everything, add/rename vars) ---
-        out_pred = src_pred.copy(deep=False).rename({"ensemble": "member"})
+        # --- Build new prediction group dataset (preserve first 5 ensemble members, add/rename vars) ---
+        out_pred = (
+            src_pred
+            .isel(ensemble=slice(0, 5))
+            .copy(deep=False)
+            .rename({"ensemble": "member"})
+        )
 
         for var, src_name, tpl in [
             ("pr", src_pr_name, tpl_pr["pr"]),
