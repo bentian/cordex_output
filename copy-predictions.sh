@@ -42,8 +42,7 @@ SRC_PRED="output_0_all.nc"
 # -------------------------
 case "$DOMAIN" in
   ALPS)
-    # MODELS=(A1 A1o A2 A2o)
-    MODELS=(A1 A1o)
+    MODELS=(A1 A1o A2 A2o)
     ;;
   NZ)
     MODELS=(N1 N1o N2 N2o)
