@@ -34,7 +34,7 @@ def _force_replace_vars(dst: xr.Dataset, tpl: xr.Dataset, names=GRID_TIME_VARS) 
 
 
 def _make_var(src, name, tpl, root, *, mean=0.0, scale=1.0):
-    print(mean, scale)
+    # print(mean, scale)
     da = (src * scale + mean).astype(np.float32).rename(name)
     da.attrs = dict(tpl.attrs)
     if "lat" in root and "lon" in root:
@@ -63,7 +63,7 @@ def convert_predictions_keep_ensemble(
       with TEMPLATE attrs (except template doesn't have ensemble; we keep it).
       Also overwrite root lat/lon/x/y to match template variables + attrs.
     """
-    # per-model normalization params (fill yours in)
+    # per-model normalization params
     MEAN = {
         "A1": {"pr": 3.0094404220581055, "tasmax": 287.3564147949219},
         "A2": {"pr": 3.023773670196533, "tasmax": 289.5425720214844},
