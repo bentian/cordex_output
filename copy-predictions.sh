@@ -43,7 +43,7 @@ SRC_PRED="output_0_all.nc"
 case "$DOMAIN" in
   ALPS)
     # MODELS=(A1 A1o A2 A2o)
-    MODELS=(A2 A2o)
+    MODELS=(A1 A1o)
     ;;
   NZ)
     MODELS=(N1 N1o N2 N2o)
@@ -108,7 +108,7 @@ for model in "${MODELS[@]}"; do
     mkdir -p "$DST_DIR"
 
     if [[ -f "$SRC_PRED_PATH" ]]; then
-      python convert_nc.py "$DOMAIN" "$SRC_PRED_PATH" "$DST_DIR/$DST_PRED"
+      python convert_nc.py "$model" "$SRC_PRED_PATH" "$DST_DIR/$DST_PRED"
       echo "[OK] ($DOMAIN/$model/$TID) → $DST_DIR/$DST_PRED"
     else
       echo "[SKIP] ($DOMAIN/$model/$TID) Missing: $SRC_PRED_PATH"

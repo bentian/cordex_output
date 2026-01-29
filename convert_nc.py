@@ -34,6 +34,7 @@ def _force_replace_vars(dst: xr.Dataset, tpl: xr.Dataset, names=GRID_TIME_VARS) 
 
 
 def _make_var(src, name, tpl, root, *, mean=0.0, scale=1.0):
+    print(mean, scale)
     da = (src * scale + mean).astype(np.float32).rename(name)
     da.attrs = dict(tpl.attrs)
     if "lat" in root and "lon" in root:
@@ -88,9 +89,8 @@ def convert_predictions_keep_ensemble(
     DOMAIN_BY_PREFIX = {"A": "ALPS", "S": "SA", "N": "NZ"}
     domain = DOMAIN_BY_PREFIX[model[0]]  # model like "A1", "S3", "N2"
 
-    tpl_pr_nc=f"./templates/pr_{domain}.nc",
+    tpl_pr_nc=f"./templates/pr_{domain}.nc"
     tpl_tasmax_nc=f"./templates/tasmax_{domain}.nc"
-    print(tpl_pr_nc, tpl_tasmax_nc)
 
     with xr.open_dataset(tpl_pr_nc) as tpl_pr, \
         xr.open_dataset(tpl_tasmax_nc) as tpl_ta, \
@@ -109,9 +109,9 @@ def convert_predictions_keep_ensemble(
             ("pr", src_pr_name, tpl_pr["pr"]),
             ("tasmax", src_tasmax_name, tpl_ta["tasmax"]),
         ]:
-            print(*ms(model, var))
+            m, s = ms(model, var)
             out_pred[var] = _make_var(
-                out_pred[src_name], var, tpl, out_root, *ms(model, var)
+                out_pred[src_name], var, tpl, out_root, mean=m, scale=s
             )
 
         out_pred = out_pred.drop_vars([src_pr_name, src_tasmax_name])
