@@ -37,8 +37,30 @@ def _make_var(src, name, tpl, root, *, mean=0.0, scale=1.0):
     # print(mean, scale)
     da = (src * scale + mean).astype(np.float32).rename(name)
     da.attrs = dict(tpl.attrs)
+
+    # Attach lat/lon only if they match da's spatial dims
     if "lat" in root and "lon" in root:
-        da = da.assign_coords(lat=root["lat"], lon=root["lon"])
+        lat = root["lat"]
+        lon = root["lon"]
+
+        # Case ALPS: template-style 2D lat/lon on (y, x)
+        if set(lat.dims).issubset(da.dims) and set(lon.dims).issubset(da.dims):
+            da = da.assign_coords(lat=lat, lon=lon)
+
+        # Case SA/NZ: 1D lat/lon on (y) and (x) (common in some grids)
+        elif lat.ndim == 1 and lon.ndim == 1 and "y" in da.dims and "x" in da.dims:
+            # If they are aligned to y/x, attach them to those dims
+            if lat.sizes.get(lat.dims[0], None) == da.sizes["y"]:
+                lat = lat.rename({lat.dims[0]: "y"})
+            if lon.sizes.get(lon.dims[0], None) == da.sizes["x"]:
+                lon = lon.rename({lon.dims[0]: "x"})
+
+            if set(lat.dims).issubset(da.dims) and set(lon.dims).issubset(da.dims):
+                da = da.assign_coords(lat=lat, lon=lon)
+            # else: skip silently (dims still don't match)
+
+        # else: skip silently (root lat/lon dims incompatible)
+
     return da
 
 
