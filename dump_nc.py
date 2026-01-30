@@ -1,3 +1,11 @@
+"""
+Utility for printing the schema of a NetCDF file.
+
+This module recursively prints all groups, dimensions, variables,
+shapes, dtypes, and attributes in a NetCDF file. It is intended for
+quick inspection and debugging of NetCDF structure from the command
+line.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,15 +14,35 @@ from netCDF4 import Dataset
 
 
 def _indent(level: int) -> str:
+    """Return indentation string for the given nesting level.
+
+    Args:
+        level: Indentation depth.
+
+    Returns:
+        A string of spaces for indentation.
+    """
     return "  " * level
 
 
 def _print_attrs(obj, level: int) -> None:
+    """Print NetCDF attributes of an object with indentation.
+
+    Args:
+        obj: NetCDF object (Dataset or Variable).
+        level: Indentation depth.
+    """
     for k in obj.ncattrs():
         print(f"{_indent(level)}- {k}: {getattr(obj, k)}")
 
 
 def _print_dims(group: Dataset, level: int) -> None:
+    """Print dimensions of a NetCDF group.
+
+    Args:
+        group: NetCDF group or dataset.
+        level: Indentation depth.
+    """
     if not group.dimensions:
         return
     print(f"{_indent(level)}Dimensions:")
@@ -24,8 +52,15 @@ def _print_dims(group: Dataset, level: int) -> None:
 
 
 def _print_vars(group: Dataset, level: int) -> None:
+    """Print variables of a NetCDF group.
+
+    Args:
+        group: NetCDF group or dataset.
+        level: Indentation depth.
+    """
     if not group.variables:
         return
+
     print(f"{_indent(level)}Variables:")
     for name, var in group.variables.items():
         print(f"{_indent(level+1)}- {name}")
@@ -38,6 +73,13 @@ def _print_vars(group: Dataset, level: int) -> None:
 
 
 def _print_group(group: Dataset, level: int = 0, name: str = "/") -> None:
+    """Recursively print a NetCDF group schema.
+
+    Args:
+        group: NetCDF group or dataset.
+        level: Indentation depth.
+        name: Group name.
+    """
     print(f"{_indent(level)}Group: {name}")
 
     if group.ncattrs():
@@ -53,9 +95,13 @@ def _print_group(group: Dataset, level: int = 0, name: str = "/") -> None:
 
 
 def print_netcdf_schema(nc_path: Union[str, Path]) -> None:
-    """
-    Print NetCDF schema including all groups, dimensions, variables,
-    dtypes, shapes, and attributes.
+    """Print the full schema of a NetCDF file.
+
+    This includes all groups, dimensions, variables, shapes,
+    dtypes, and attributes.
+
+    Args:
+        nc_path: Path to the NetCDF file.
     """
     nc_path = Path(nc_path)
 

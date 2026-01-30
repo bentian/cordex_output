@@ -1,3 +1,17 @@
+"""
+Convert CORDEX-style prediction NetCDF files into benchmark-compliant format.
+
+This module:
+- Maps model identifiers (e.g. A1, A1o, S2) to CORDEX domains.
+- Applies per-model mean/scale transformations to prediction variables.
+- Renames and standardizes prediction variables (e.g. precipitation → pr).
+- Harmonizes spatial grid variables (lat/lon/x/y) with provided templates.
+- Preserves a subset of ensemble members (first 5) and renames the
+  ensemble dimension to `member`.
+
+The resulting NetCDF file contains a standardized prediction dataset
+compatible with the ML benchmark submission format.
+"""
 import sys
 import numpy as np
 import xarray as xr
@@ -23,19 +37,55 @@ SCALE = {
 }
 
 def mean_n_scale(model: str, var: str) -> tuple[float, float]:
+    """Return mean and scale for a model/variable pair.
+
+    Args:
+        model: Model identifier (e.g. "A1", "A1o", "S2").
+        var: Variable name ("pr" or "tasmax").
+
+    Returns:
+        (mean, scale) tuple.
+    """
     m = model.rstrip("o")
     return MEAN[m][var], SCALE[m][var]
 
 def replace_grid(dst: xr.Dataset, tpl: xr.Dataset) -> xr.Dataset:
+    """Replace grid variables (lat/lon/x/y) using a template dataset.
+
+    Args:
+        dst: Dataset to modify.
+        tpl: Template dataset providing the grid.
+
+    Returns:
+        Dataset with standardized grid coordinates.
+    """
     dst = dst.drop_vars(GRID, errors="ignore").assign({v: tpl[v] for v in GRID if v in tpl})
     for v in GRID:
         if v in dst and v in tpl:
             dst[v].attrs = dict(tpl[v].attrs)
     return dst.set_coords([v for v in GRID if v in dst])
 
-def make_var(src: xr.DataArray, name: str,
-             tpl_var: xr.DataArray, root: xr.Dataset,
-             mean: float, scale: float) -> xr.DataArray:
+def make_var(
+    src: xr.DataArray,
+    name: str,
+    tpl_var: xr.DataArray,
+    root: xr.Dataset,
+    mean: float,
+    scale: float
+) -> xr.DataArray:
+    """Scale, rename, and attach grid metadata to a prediction variable.
+
+    Args:
+        src: Source prediction variable.
+        name: Output variable name.
+        tpl_var: Template variable for metadata.
+        root: Root dataset containing grid coordinates.
+        mean: Additive mean.
+        scale: Multiplicative scale.
+
+    Returns:
+        Transformed prediction variable.
+    """
     da = (src * scale + mean).astype(np.float32).rename(name)
     da.attrs = dict(tpl_var.attrs)
 
@@ -52,9 +102,22 @@ def make_var(src: xr.DataArray, name: str,
 
     return da
 
-def convert(model: str, src_nc: str, out_nc: str,
-            pr_name="precipitation",
-            tas_name="max_surface_temperature") -> None:
+def convert(
+    model: str,
+    src_nc: str,
+    out_nc: str,
+    pr_name="precipitation",
+    tas_name="max_surface_temperature"
+) -> None:
+    """Convert a prediction NetCDF file to benchmark format.
+
+    Args:
+        model: Model identifier (e.g. "A1", "S2o", "N1").
+        src_nc: Path to source NetCDF file.
+        out_nc: Path to output NetCDF file.
+        pr_name: Source precipitation variable name.
+        tas_name: Source temperature variable name.
+    """
     dom = DOMAIN[model[0]]
     tpl_pr_nc, tpl_ta_nc = f"./templates/pr_{dom}.nc", f"./templates/tasmax_{dom}.nc"
 
