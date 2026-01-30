@@ -1,8 +1,11 @@
 # CORDEX ML Prediction Conversion Utilities
 
-This repository contains utilities for __post-processing CORDEX ML model predictions__ into a __benchmark-compliant NetCDF format__, organizing them into the required directory structure, and inspecting NetCDF schemas for validation and debugging.
+This repository contains utilities for __post-processing CORDEX ML model predictions__ into a
+__benchmark-compliant NetCDF format__, organizing them into the required directory structure,
+and inspecting NetCDF schemas for validation and debugging.
 
-The tools are designed to support __multiple domains, models, experiments, and ensemble members__, and to integrate smoothly with automated submission workflows.
+The tools are designed to support __multiple domains, models, experiments, and ensemble members__,
+and to integrate smoothly with automated submission workflows.
 
 ## Contents
 - `convert_nc.py` – Convert raw prediction NetCDFs into benchmark format
@@ -36,13 +39,14 @@ Convert raw ML prediction NetCDF files into the __C__ORDEX ML-Benchmark submissi
 - Preserving metadata and attributes from templates
 
 ### Supported Models
-| Domain | Models |
+| Domain | [Models](https://docs.google.com/spreadsheets/d/1Pkn9ysUWq7sR7xB51Vdf5cAhwpaYeR0sjZHiz6NqKzQ/edit?gid=1634578103#gid=1634578103) |
 | :--- | :--- |
 | ALPS | A1, A1o, A2, A2o |
 | SA | S1, S1o, S2, S2o |
 | NZ | N1, N1o, N2, N2o |
 
-Models with an `o` suffix (e.g. `A1o`) share the same normalization parameters as their base model (`A1`).
+Models with an `o` suffix (e.g. `A1o`) share the same normalization parameters
+as their base model (`A1`).
 
 ### Usage
 ```
@@ -65,7 +69,8 @@ The script expects domain-specific templates at:
 └── tasmax_NZ.nc
 ```
 
-The `templates/` directory is s a local copy of the official templates provided in the [CORDEX ML-Benchmark submission guidelines](https://github.com/WCRP-CORDEX/ml-benchmark/tree/main/format_predictions/templates).
+The `templates/` directory is s a local copy of the official templates provided in the
+[CORDEX ML-Benchmark submission guidelines](https://github.com/WCRP-CORDEX/ml-benchmark/tree/main/format_predictions/templates).
 
 ## `copy-predictions.sh`
 
