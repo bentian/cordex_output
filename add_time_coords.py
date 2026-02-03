@@ -1,8 +1,12 @@
+"""
+Add time coordinates from dataset A to dataset B.
+"""
 import argparse
 import xarray as xr
 
 
-def add_time_from_A_to_B(nc_w_time: str, nc_wo_time: str, out_path: str):
+def add_time_coord(nc_w_time: str, nc_wo_time: str, out_path: str):
+    """Add time coordinates from dataset A to dataset B."""
     ds_w_time = xr.open_dataset(nc_w_time)
     ds_wo_time = xr.open_dataset(nc_wo_time)
 
@@ -17,6 +21,7 @@ def add_time_from_A_to_B(nc_w_time: str, nc_wo_time: str, out_path: str):
 
 
 def main():
+    """Entry-point for the script."""
     parser = argparse.ArgumentParser(
         description="Add time coordinates from dataset A to dataset B"
     )
@@ -25,7 +30,7 @@ def main():
     parser.add_argument("path_C", help="Output NetCDF file")
 
     args = parser.parse_args()
-    add_time_from_A_to_B(args.path_A, args.path_B, args.path_C)
+    add_time_coord(args.path_A, args.path_B, args.path_C)
 
 
 if __name__ == "__main__":
