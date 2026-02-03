@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Union
 from netCDF4 import Dataset
+import xarray as xr
 
 
 def _indent(level: int) -> str:
@@ -111,6 +112,9 @@ def print_netcdf_schema(nc_path: Union[str, Path]) -> None:
         _print_group(root)
 
     print("\n=== End of schema ===\n")
+
+    with xr.open_dataset(nc_path) as ds:
+        print(ds)
 
 
 if __name__ == "__main__":
