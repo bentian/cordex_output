@@ -26,12 +26,8 @@ import diagnostics
 
 DEBUG = False # Set to True to enable debugging
 
-OUTPUT_DIR = Path("metrics_plots")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-def save_metric_plot(metric, title, filename):
+def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Path) -> None:
     """Save metric as PNG."""
-
     plt.figure(figsize=(6, 4))
 
     # Convert Dataset -> DataArray
@@ -92,16 +88,14 @@ def save_metric_plot(metric, title, filename):
 
     plt.title(title)
     plt.tight_layout()
-
-    output_path = OUTPUT_DIR / filename
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(filename, dpi=200)
     plt.close()
 
-    print(f"Saved: {output_path}")
+    print(f"Saved: {filename}")
 
 
-def compute_pr_metrics(x0: xr.Dataset, x1: xr.Dataset) -> None:
-    """Compute precipitation diagnostics metrics."""
+def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+    """Compute precipitation diagnostics metrics and save to plots."""
 
     metrics = {
         "rmse": lambda: diagnostics.rmse(
@@ -135,12 +129,12 @@ def compute_pr_metrics(x0: xr.Dataset, x1: xr.Dataset) -> None:
         save_metric_plot(
             metric,
             title=name,
-            filename=f"pr_{name}.png",
+            filename=output_dir / f"pr_{name}.png",
         )
 
 
-def compute_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset) -> None:
-    """Compute tasmax diagnostics metrics."""
+def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+    """Compute tasmax diagnostics metrics and save to plots."""
 
     metrics = {
         "rmse": lambda: diagnostics.rmse(
@@ -178,47 +172,58 @@ def compute_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset) -> None:
         save_metric_plot(
             metric,
             title=name,
-            filename=f"tasmax_{name}.png",
+            filename=output_dir / f"tasmax_{name}.png",
         )
 
 
-def compute_correlation_bias(x0: xr.Dataset, x1: xr.Dataset) -> None:
-    """Compute correlation bias between temperature and precipitation."""
-
-    correlation_bias = diagnostics.bias_multivariable_correlation(
-        x0,
-        x1,
-        var_x="tasmax",
-        var_y="pr"
-    )
+def plot_correlation_bias(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+    """Compute correlation bias between temperature and precipitation and save to plot."""
 
     print("\n=== Correlation Bias ===")
     save_metric_plot(
-        correlation_bias,
+        diagnostics.bias_multivariable_correlation(x0, x1, var_x="tasmax", var_y="pr"),
         title="Correlation Bias",
-        filename="correlation_bias.png",
+        filename=output_dir / "correlation_bias.png",
     )
+
 
 def main():
     """ Compute pr & tasmax diagnostics metrics. """
     parser = argparse.ArgumentParser(description="Compute pr & tasmax diagnostics metrics.")
     parser.add_argument("target", help="Path to target/reference folder")
     parser.add_argument("prediction", help="Path to prediction folder")
+    parser.add_argument(
+        "--output-dir",
+        default="metrics_plots",
+        help="Directory to save metric PNGs",
+    )
     args = parser.parse_args()
 
-    # target = "../../input/data/cordex/SA_domain/test/mid_century/target/pr_tasmax_ACCESS-CM2_2041-2060.nc"
-    # prediction = "../submission/NO_OROG/SA_Domain/ESD_pseudo_reality/mid_century/imperfect/Predictions_pr_tasmax_ACCESS-CM2_2041-2060.nc"
+    # x0 = xr.open_dataset(
+    #     "../../input/data/cordex/SA_domain/"
+    #     "test/mid_century/target/pr_tasmax_ACCESS-CM2_2041-2060.nc"
+    # )
+    # x1 = xr.open_dataset(
+    #     "../submission/NO_OROG/SA_Domain/"
+    #     "ESD_pseudo_reality/mid_century/imperfect/Predictions_pr_tasmax_ACCESS-CM2_2041-2060.nc"
+    # ).mean("member")
 
+    # Get target and prediction datasets
     x0 = xr.open_dataset(args.target)
     x1 = xr.open_dataset(args.prediction).mean("member")
     if DEBUG:
         x0, x1 = x0.isel(time=slice(0, 10)), x1.isel(time=slice(0, 10))
 
-    # compute_pr_metrics(x0, x1)
-    # compute_tasmax_metrics(x0, x1)
-    compute_correlation_bias(x0, x1)
+    # Create output folder
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nAll plots saved to: {OUTPUT_DIR.resolve()}")
+    # Compute metrics and save to plots
+    plot_pr_metrics(x0, x1, output_dir)
+    plot_tasmax_metrics(x0, x1, output_dir)
+    plot_correlation_bias(x0, x1, output_dir)
+
+    print(f"\nAll plots saved to: {output_dir.resolve()}")
 
 
 if __name__ == "__main__":
