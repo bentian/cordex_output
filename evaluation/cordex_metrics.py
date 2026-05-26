@@ -201,15 +201,6 @@ def main():
     )
     args = parser.parse_args()
 
-    # x0 = xr.open_dataset(
-    #     "../../input/data/cordex/SA_domain/"
-    #     "test/mid_century/target/pr_tasmax_ACCESS-CM2_2041-2060.nc"
-    # )
-    # x1 = xr.open_dataset(
-    #     "../submission/NO_OROG/SA_Domain/"
-    #     "ESD_pseudo_reality/mid_century/imperfect/Predictions_pr_tasmax_ACCESS-CM2_2041-2060.nc"
-    # ).mean("member")
-
     # Get target and prediction datasets
     x0 = xr.open_dataset(args.target)
     x1 = xr.open_dataset(args.prediction).mean("member")
