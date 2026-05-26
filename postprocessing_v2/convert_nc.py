@@ -2,53 +2,42 @@
 Convert CORDEX-style prediction NetCDF files into benchmark-compliant
 submission files.
 
-This script reformats prediction datasets to match the official
-CORDEX ML benchmark submission structure and metadata conventions.
+This script:
+- maps model identifiers (A1, S2, N1o, ...) to benchmark domains
+- standardizes dimensions and coordinates
+- renames prediction variables to benchmark names
+- optionally de-normalizes predictions using per-model statistics
+- aligns time/grid coordinates with a reference NetCDF file
+- applies metadata from official template files
+- writes benchmark-compatible NetCDF output
 
-Features
---------
-- Maps compact model identifiers (e.g. A1, S2, N1o) to benchmark domains.
-- Standardizes variable names:
-    precipitation            -> pr
-    max_surface_temperature  -> tasmax
-- Preserves only the first 5 ensemble members.
-- Renames the ensemble dimension to `member`.
-- Reorders dimensions to benchmark-required layout:
+Output dimensions:
     ALPS -> (time, x, y, member)
     SA/NZ -> (time, lat, lon, member)
-- Applies optional de-normalization using per-model mean/scale statistics.
-- Copies spatial coordinates and metadata from benchmark template files.
-- Reuses the target submission file time coordinate to ensure exact
-  temporal alignment with benchmark formatting.
 
-Output
-------
-The generated NetCDF files are compatible with the official benchmark
-submission format and can be written directly into the required
-submission directory structure.
+Usage:
+    python convert_nc.py <model> <src.nc> <ref.nc> <out.nc>
 
-Usage
------
-python convert_nc.py <model> <src.nc> <out_dir> <out.nc>
-
-Example
--------
-python convert_nc.py \
-    A1 \
-    predictions.nc \
-    submission_files/ALPS_Domain/ESD_pseudo_reality/mid_century/perfect \
-    Predictions_pr_tasmax_CNRM-CM5_2041-2060.nc
+Example:
+    python convert_nc.py \
+        A1 \
+        predictions.nc \
+        reference.nc \
+        output.nc
 """
-
+from pathlib import Path
 import sys
 import numpy as np
 import xarray as xr
 
-DOMAIN = {"A": "ALPS", "S": "SA", "N": "NZ"}
-SPATIAL_DIMS = {
-    "ALPS": ("x", "y"),
-    "SA": ("lat", "lon"),
-    "NZ": ("lat", "lon"),
+DOMAIN_INFO = {
+    "A": ("ALPS", ("x", "y")),
+    "S": ("SA", ("lat", "lon")),
+    "N": ("NZ", ("lat", "lon")),
+}
+VAR_MAP = {
+    "pr": "precipitation",
+    "tasmax": "max_surface_temperature",
 }
 
 APPLY_DENORM = True
@@ -70,15 +59,7 @@ SCALE = {
 }
 
 def mean_n_scale(model: str, var: str) -> tuple[float, float]:
-    """Return mean and scale for a model/variable pair.
-
-    Args:
-        model: Model identifier (e.g. "A1", "A1o", "S2").
-        var: Variable name ("pr" or "tasmax").
-
-    Returns:
-        (mean, scale) tuple.
-    """
+    """Return mean and scale for a model/variable pair."""
     m = model.rstrip("o")
     return MEAN[m][var], SCALE[m][var]
 
@@ -91,59 +72,59 @@ def convert(
 ) -> None:
     """
     Convert CORDEX-style prediction NetCDF files into benchmark-compliant format.
-    
+
     Args:
         model: Model identifier (e.g. "A1", "A1o", "S2").
         src_nc: Path to the source NetCDF file.
-        out_dir: Directory to save the output NetCDF file.
-        out_nc: Name of the output NetCDF file.
+        ref_nc: Path to the reference NetCDF file.
+        out_nc: Path to the output NetCDF file.
     """
 
-    domain = DOMAIN[model[0]]
-    spatial_dims = SPATIAL_DIMS[domain]
+    domain, spatial_dims = DOMAIN_INFO[model[0]]
     templates = {
-        "pr": xr.open_dataset(f"../data/templates/pr_{domain}.nc"),
-        "tasmax": xr.open_dataset(f"../data/templates/tasmax_{domain}.nc"),
+        var: xr.open_dataset(f"../data/templates/{var}_{domain}.nc")
+        for var in VAR_MAP
     }
 
     with xr.open_dataset(src_nc, group="prediction") as pred_ds, \
          xr.open_dataset(ref_nc) as ref_ds:
-        # Keep first 5 ensemble members only and ensure spatial dims in correct order
-        pred = (
-            pred_ds.isel(ensemble=slice(0, 5))
-            .rename(ensemble="member")
-            .transpose("time", *spatial_dims, "member")
-        )
 
         # Check whether time dimension length matches
-        if pred.sizes["time"] != ref_ds.sizes["time"]:
+        if pred_ds.sizes["time"] != ref_ds.sizes["time"]:
             raise ValueError("Time dimension length mismatch between prediction and reference")
 
+        # Keep first 5 ensemble members only and ensure spatial dims in correct order
+        pred_ds = (
+            pred_ds.isel(ensemble=slice(0, 5))
+            .rename(ensemble="member")
+            .transpose("time", "y", "x", "member")
+        )
+
         out = xr.Dataset(coords={"time": ref_ds.time})
-        for var, src_var in {
-            "pr": "precipitation",
-            "tasmax": "max_surface_temperature",
-        }.items():
+        for var, src_var in VAR_MAP.items():
             tpl = templates[var]
-            da = pred[src_var].astype(np.float32).rename(var)
+            src = pred_ds[src_var].astype(np.float32).rename(var)
+
+            da = xr.DataArray(
+                data=src.values,
+                dims=("time", *spatial_dims, "member"),
+                coords={
+                    "time": ref_ds.time,
+                    **{dim: tpl[dim] for dim in spatial_dims},
+                    "member": src["member"],
+                },
+                name=var,
+                attrs=dict(templates[var][var].attrs),
+            )
 
             # Denormalize it if APPLY_DENORM is True
             if APPLY_DENORM:
                 mean, scale = mean_n_scale(model, var)
                 da = da * scale + mean
 
-            # Assign coordinates from the template and reference NetCDF files
-            da = da.assign_coords(
-                time=ref_ds.time,
-                **{
-                    dim: tpl[dim]
-                    for dim in spatial_dims
-                }
-            )
-            da.attrs = dict(tpl[var].attrs)
-
             out[var] = da
 
+        Path(out_nc).parent.mkdir(parents=True, exist_ok=True)
         out.to_netcdf(out_nc)
 
 
@@ -152,4 +133,4 @@ if __name__ == "__main__":
         print("Usage: python convert_nc.py <model> <src.nc> <ref.nc> <out.nc>")
         sys.exit(1)
 
-    convert(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    convert(*sys.argv[1:])

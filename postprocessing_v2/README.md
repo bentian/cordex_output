@@ -59,7 +59,7 @@ python convert_nc.py A1 output_0_all.nc Predictions_pr_tasmax_CNRM-CM5_1981-2000
 ### Templates
 The script expects domain-specific templates at:
 ```
-./templates/
+./data/templates/
 ├── pr_ALPS.nc
 ├── pr_SA.nc
 ├── pr_NZ.nc

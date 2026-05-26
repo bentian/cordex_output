@@ -76,49 +76,44 @@ model_subdir() {
 # TID → OUTPUT MAPPINGS
 # -------------------------
 MAPPINGS=(
-  "T1|historical/perfect|$TRAINING_GCM|1981-2000"
-  "T2|mid_century/perfect|$TRAINING_GCM|2041-2060"
-  "T3|end_century/perfect|$TRAINING_GCM|2080-2099"
-  # "T4|historical/perfect|$OUT_OF_SAMPLE_GCM|1981-2000"
-  "T5|mid_century/perfect|$OUT_OF_SAMPLE_GCM|2041-2060"
-  "T6|end_century/perfect|$OUT_OF_SAMPLE_GCM|2080-2099"
+  "T1 historical perfect   $TRAINING_GCM      1981-2000"
+  "T2 mid_century perfect  $TRAINING_GCM      2041-2060"
+  "T3 end_century perfect  $TRAINING_GCM      2080-2099"
+  # "T4 historical perfect $OUT_OF_SAMPLE_GCM 1981-2000"
+  "T5 mid_century perfect  $OUT_OF_SAMPLE_GCM 2041-2060"
+  "T6 end_century perfect  $OUT_OF_SAMPLE_GCM 2080-2099"
 
-  "T7|historical/imperfect|$TRAINING_GCM|1981-2000"
-  "T8|mid_century/imperfect|$TRAINING_GCM|2041-2060"
-  "T9|end_century/imperfect|$TRAINING_GCM|2080-2099"
-  # "T10|historical/imperfect|$OUT_OF_SAMPLE_GCM|1981-2000"
-  "T11|mid_century/imperfect|$OUT_OF_SAMPLE_GCM|2041-2060"
-  # "T12|end_century/imperfect|$OUT_OF_SAMPLE_GCM|2080-2099"
+  "T7 historical imperfect   $TRAINING_GCM      1981-2000"
+  "T8 mid_century imperfect  $TRAINING_GCM      2041-2060"
+  "T9 end_century imperfect  $TRAINING_GCM      2080-2099"
+  # "T10 historical imperfect $OUT_OF_SAMPLE_GCM 1981-2000"
+  "T11 mid_century imperfect $OUT_OF_SAMPLE_GCM 2041-2060"
+  # "T12 end_century imperfect $OUT_OF_SAMPLE_GCM 2080-2099"
 )
 
 # -------------------------
 # MAIN LOOP
 # -------------------------
 for model in "${MODELS[@]}"; do
-  IN_MODEL_DIR="${SRC_TOP_DIR%/}/$model"
-  OUT_MODEL_DIR="${DST_TOP_DIR%/}/$(model_subdir "$model")"
+  in_dir="${SRC_TOP_DIR%/}/$model"
+  out_dir="${DST_TOP_DIR%/}/$(model_subdir "$model")"
 
   for entry in "${MAPPINGS[@]}"; do
-    IFS="|" read -r TID OUT_SUBDIR GCM PERIOD <<< "$entry"
-    IFS='/' read -r period condition <<< "$OUT_SUBDIR"
+    read -r tid period condition gcm years <<< "$entry"
 
-    # Check REF_NC exists for time coordinate
-    REF_NC="${REF_TOP_DIR%/}/${DOMAIN}_domain/test/${period}/predictors/${condition}/${GCM}_${PERIOD}.nc"
-    if [[ ! -f "$REF_NC" ]]; then
-      echo "Missing REF_NC: $REF_NC"
-      exit 1
-    fi
+    ref_nc="${REF_TOP_DIR%/}/${DOMAIN}_domain/test/$period/predictors/$condition/${gcm}_${years}.nc"
+    src_nc="$in_dir/$tid/$SRC_PRED"
+    dst_dir="$out_dir/$period/$condition"
+    dst_nc="$dst_dir/Predictions_pr_tasmax_${gcm}_${years}.nc"
 
-    SRC_PRED_PATH="${IN_MODEL_DIR}/${TID}/${SRC_PRED}"
-    DST_DIR="${OUT_MODEL_DIR}/${OUT_SUBDIR}"
-    DST_PRED="Predictions_pr_tasmax_${GCM}_${PERIOD}.nc"
+    [[ -f "$ref_nc" ]] || { echo "Missing REF_NC: $ref_nc"; exit 1; }
 
-    mkdir -p "$DST_DIR"
-    if [[ -f "$SRC_PRED_PATH" ]]; then
-      python convert_nc.py "$model" "$SRC_PRED_PATH" "$REF_NC" "$DST_DIR/$DST_PRED"
-      echo -e "[OK] ($DOMAIN/$model/$TID) → $DST_DIR/$DST_PRED\n     w/ REF: $REF_NC"
+    if [[ -f "$src_nc" ]]; then
+      mkdir -p "$dst_dir"
+      python convert_nc.py "$model" "$src_nc" "$ref_nc" "$dst_nc"
+      echo -e "[OK] ($DOMAIN/$model/$tid) -> $dst_nc\n     w/ REF: $ref_nc"
     else
-      echo "[SKIP] ($DOMAIN/$model/$TID) Missing: $SRC_PRED_PATH"
+      echo "[SKIP] ($DOMAIN/$model/$tid) Missing: $src_nc"
     fi
   done
 done
