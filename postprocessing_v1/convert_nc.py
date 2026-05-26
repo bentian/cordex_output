@@ -119,7 +119,7 @@ def convert(
         tas_name: Source temperature variable name.
     """
     dom = DOMAIN[model[0]]
-    tpl_pr_nc, tpl_ta_nc = f"./templates/pr_{dom}.nc", f"./templates/tasmax_{dom}.nc"
+    tpl_pr_nc, tpl_ta_nc = f"../data/templates/pr_{dom}.nc", f"../data/templates/tasmax_{dom}.nc"
 
     with xr.open_dataset(tpl_pr_nc) as tpl_pr, \
          xr.open_dataset(tpl_ta_nc) as tpl_ta, \

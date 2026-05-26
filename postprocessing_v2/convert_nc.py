@@ -102,8 +102,8 @@ def convert(
     domain = DOMAIN[model[0]]
     spatial_dims = SPATIAL_DIMS[domain]
     templates = {
-        "pr": xr.open_dataset(f"./templates/pr_{domain}.nc"),
-        "tasmax": xr.open_dataset(f"./templates/tasmax_{domain}.nc"),
+        "pr": xr.open_dataset(f"../data/templates/pr_{domain}.nc"),
+        "tasmax": xr.open_dataset(f"../data/templates/tasmax_{domain}.nc"),
     }
 
     with xr.open_dataset(src_nc, group="prediction") as pred_ds, \
