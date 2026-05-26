@@ -10,7 +10,6 @@ and to integrate smoothly with automated submission workflows.
 ## Contents
 - `convert_nc.py` – Convert raw prediction NetCDFs into benchmark format
 - `copy-predictions.sh` – Batch conversion and directory organization script
-- `dump_nc.py` – Inspect and print NetCDF schema (groups, variables, attributes)
 
 ## Requirements
 
@@ -18,7 +17,7 @@ and to integrate smoothly with automated submission workflows.
 - `numpy`
 - `xarray`
 - `netCDF4`
-- Bash (for `copy-predictions.sh`)
+- Bash (for `copy-predictions.sh`)g
 
 Example installation:
 ```
@@ -60,7 +59,7 @@ python convert_nc.py A1 output_0_all.nc Predictions_pr_tasmax_CNRM-CM5_1981-2000
 ### Templates
 The script expects domain-specific templates at:
 ```
-./templates/
+./data/templates/
 ├── pr_ALPS.nc
 ├── pr_SA.nc
 ├── pr_NZ.nc
@@ -105,56 +104,10 @@ Example:
 - Automatically skips missing inputs
 - Prints `[OK]` or `[SKIP]` status per file
 
-## `dump_nc.py`
-
-### Purpose
-Print a human-readable schema of a NetCDF file, including:
-- Groups (recursive)
-- Dimensions (with sizes and UNLIMITED flags)
-- Variables (dims, shape, dtype)
-- Attributes (dataset and variable level)
-Useful for:
-- Debugging metadata issues
-- Verifying submission compliance
-- Comparing converted files to templates
-
-### Usage
-```
-python dump_nc.py <NETCDF_FILE>
-```
-Example:
-```
-python dump_nc.py Predictions_pr_tasmax_CNRM-CM5_1981-2000.nc
-```
-Example output:
-```
-=== NetCDF schema: Predictions_pr_tasmax_CNRM-CM5_1981-2000.nc ===
-
-Group: /
-  Dimensions:
-    - time: UNLIMITED
-    - member: 5
-    - y: 128
-    - x: 128
-  Variables:
-    - pr
-      dims: ('member', 'time', 'y', 'x')
-      shape: (5, 7305, 128, 128)
-      dtype: float32
-      attrs:
-        - units: kg m-2 s-1
-...
-=== End of schema ===
-```
-
 ### Typical Workflow
 1. Generate raw predictions from ML models (`output_0_all.nc`)
 2. Batch convert + organize:
 ```
 ./copy-predictions.sh ALPS raw_outputs submission_files
 ```
-3. Inspect outputs:
-```
-python dump_nc.py submission_files/ALPS_Domain/...
-```
-4. Zip and submit to the CORDEX ML-Benchmark
+3. Zip and submit to the CORDEX ML-Benchmark

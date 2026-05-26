@@ -115,20 +115,24 @@ def convert(
             .transpose("time", *spatial_dims, "member")
         )
 
+        # Check whether time dimension length matches
+        if pred.sizes["time"] != ref_ds.sizes["time"]:
+            raise ValueError("Time dimension length mismatch between prediction and reference")
+
         out = xr.Dataset(coords={"time": ref_ds.time})
         for var, src_var in {
             "pr": "precipitation",
             "tasmax": "max_surface_temperature",
         }.items():
             tpl = templates[var]
-            mean, scale = mean_n_scale(model, var)
-
-            # Rename the variable and denormalize it if APPLY_DENORM is True
             da = pred[src_var].astype(np.float32).rename(var)
+
+            # Denormalize it if APPLY_DENORM is True
             if APPLY_DENORM:
+                mean, scale = mean_n_scale(model, var)
                 da = da * scale + mean
 
-            # Add the coordinate information from the input
+            # Assign coordinates from the template and reference NetCDF files
             da = da.assign_coords(
                 time=ref_ds.time,
                 **{
