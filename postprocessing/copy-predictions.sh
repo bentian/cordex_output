@@ -4,14 +4,15 @@ set -euo pipefail
 # -------------------------
 # ARGUMENTS
 # -------------------------
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <DOMAIN:{ALPS|NZ|SA}> <SRC_TOP_DIR> <DST_TOP_DIR>"
+if [[ $# -ne 4 ]]; then
+  echo "Usage: $0 <DOMAIN:{ALPS|NZ|SA}> <SRC_TOP_DIR> <REF_TOP_DIR> <DST_TOP_DIR>"
   exit 1
 fi
 
 DOMAIN="$1"
 SRC_TOP_DIR="$2"
-DST_TOP_DIR="$3"
+REF_TOP_DIR="$3"
+DST_TOP_DIR="$4"
 
 # -------------------------
 # DOMAIN → GCM CONFIG
@@ -99,16 +100,23 @@ for model in "${MODELS[@]}"; do
 
   for entry in "${MAPPINGS[@]}"; do
     IFS="|" read -r TID OUT_SUBDIR GCM PERIOD <<< "$entry"
+    IFS='/' read -r period condition <<< "$OUT_SUBDIR"
+
+    # Check REF_NC exists for time coordinate
+    REF_NC="${REF_TOP_DIR%/}/${DOMAIN}_domain/test/${period}/predictors/${condition}/${GCM}_${PERIOD}.nc"
+    if [[ ! -f "$REF_NC" ]]; then
+      echo "Missing REF_NC: $REF_NC"
+      exit 1
+    fi
 
     SRC_PRED_PATH="${IN_MODEL_DIR}/${TID}/${SRC_PRED}"
     DST_DIR="${OUT_MODEL_DIR}/${OUT_SUBDIR}"
     DST_PRED="Predictions_pr_tasmax_${GCM}_${PERIOD}.nc"
 
     mkdir -p "$DST_DIR"
-
     if [[ -f "$SRC_PRED_PATH" ]]; then
-      python convert_nc.py "$model" "$SRC_PRED_PATH" "$DST_DIR/$DST_PRED"
-      echo "[OK] ($DOMAIN/$model/$TID) → $DST_DIR/$DST_PRED"
+      python convert_nc.py "$model" "$SRC_PRED_PATH" "$REF_NC" "$DST_DIR/$DST_PRED"
+      echo -e "[OK] ($DOMAIN/$model/$TID) → $DST_DIR/$DST_PRED\n     w/ REF: $REF_NC"
     else
       echo "[SKIP] ($DOMAIN/$model/$TID) Missing: $SRC_PRED_PATH"
     fi

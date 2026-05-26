@@ -1,58 +1,24 @@
 """
-Convert CORDEX-style prediction NetCDF files into benchmark-compliant
-submission files.
+Convert CORDEX-style prediction NetCDF files into benchmark-compliant format.
 
-This script reformats prediction datasets to match the official
-CORDEX ML benchmark submission structure and metadata conventions.
+This module:
+- Maps model identifiers (e.g. A1, A1o, S2) to CORDEX domains.
+- Applies per-model mean/scale transformations to prediction variables.
+- Renames and standardizes prediction variables (e.g. precipitation → pr).
+- Harmonizes spatial grid variables (lat/lon/x/y) with provided templates.
+- Preserves a subset of ensemble members (first 5) and renames the
+  ensemble dimension to `member`.
 
-Features
---------
-- Maps compact model identifiers (e.g. A1, S2, N1o) to benchmark domains.
-- Standardizes variable names:
-    precipitation            -> pr
-    max_surface_temperature  -> tasmax
-- Preserves only the first 5 ensemble members.
-- Renames the ensemble dimension to `member`.
-- Reorders dimensions to benchmark-required layout:
-    ALPS -> (time, x, y, member)
-    SA/NZ -> (time, lat, lon, member)
-- Applies optional de-normalization using per-model mean/scale statistics.
-- Copies spatial coordinates and metadata from benchmark template files.
-- Reuses the target submission file time coordinate to ensure exact
-  temporal alignment with benchmark formatting.
-
-Output
-------
-The generated NetCDF files are compatible with the official benchmark
-submission format and can be written directly into the required
-submission directory structure.
-
-Usage
------
-python convert_nc.py <model> <src.nc> <out_dir> <out.nc>
-
-Example
--------
-python convert_nc.py \
-    A1 \
-    predictions.nc \
-    submission_files/ALPS_Domain/ESD_pseudo_reality/mid_century/perfect \
-    Predictions_pr_tasmax_CNRM-CM5_2041-2060.nc
+The resulting NetCDF file contains a standardized prediction dataset
+compatible with the ML benchmark submission format.
 """
-
-from pathlib import Path
 import sys
 import numpy as np
 import xarray as xr
 
+GRID = ["lat", "lon", "x", "y"]
 DOMAIN = {"A": "ALPS", "S": "SA", "N": "NZ"}
-SPATIAL_DIMS = {
-    "ALPS": ("x", "y"),
-    "SA": ("lat", "lon"),
-    "NZ": ("lat", "lon"),
-}
 
-APPLY_DENORM = True
 MEAN = {
     "A1": {"pr": 3.0094404220581055, "tasmax": 287.3564147949219},
     "A2": {"pr": 3.023773670196533, "tasmax": 289.5425720214844},
@@ -83,71 +49,111 @@ def mean_n_scale(model: str, var: str) -> tuple[float, float]:
     m = model.rstrip("o")
     return MEAN[m][var], SCALE[m][var]
 
+def replace_grid(dst: xr.Dataset, tpl: xr.Dataset) -> xr.Dataset:
+    """Replace grid variables (lat/lon/x/y) using a template dataset.
+
+    Args:
+        dst: Dataset to modify.
+        tpl: Template dataset providing the grid.
+
+    Returns:
+        Dataset with standardized grid coordinates.
+    """
+    dst = dst.drop_vars(GRID, errors="ignore").assign({v: tpl[v] for v in GRID if v in tpl})
+    for v in GRID:
+        if v in dst and v in tpl:
+            dst[v].attrs = dict(tpl[v].attrs)
+    return dst.set_coords([v for v in GRID if v in dst])
+
+def make_var(
+    src: xr.DataArray,
+    name: str,
+    tpl_var: xr.DataArray,
+    root: xr.Dataset,
+    mean: float,
+    scale: float
+) -> xr.DataArray:
+    """Scale, rename, and attach grid metadata to a prediction variable.
+
+    Args:
+        src: Source prediction variable.
+        name: Output variable name.
+        tpl_var: Template variable for metadata.
+        root: Root dataset containing grid coordinates.
+        mean: Additive mean.
+        scale: Multiplicative scale.
+
+    Returns:
+        Transformed prediction variable.
+    """
+    da = (src * scale + mean).astype(np.float32).rename(name)
+    da.attrs = dict(tpl_var.attrs)
+
+    lat, lon = root.get("lat"), root.get("lon")
+    if lat is not None and lon is not None:
+        # assign only when compatible (2D y/x or 1D mapped onto y/x)
+        if set(lat.dims) <= set(da.dims) and set(lon.dims) <= set(da.dims):
+            da = da.assign_coords(lat=lat, lon=lon)
+        elif lat.ndim == lon.ndim == 1 and "y" in da.dims and "x" in da.dims:
+            lat2 = lat.rename({lat.dims[0]: "y"}) if lat.size == da.sizes["y"] else lat
+            lon2 = lon.rename({lon.dims[0]: "x"}) if lon.size == da.sizes["x"] else lon
+            if set(lat2.dims) <= set(da.dims) and set(lon2.dims) <= set(da.dims):
+                da = da.assign_coords(lat=lat2, lon=lon2)
+
+    return da
 
 def convert(
     model: str,
     src_nc: str,
-    out_dir: str,
-    out_nc: str
+    out_nc: str,
+    pr_name="precipitation",
+    tas_name="max_surface_temperature"
 ) -> None:
-    """
-    Convert CORDEX-style prediction NetCDF files into benchmark-compliant format.
-    
+    """Convert a prediction NetCDF file to benchmark format.
+
     Args:
-        model: Model identifier (e.g. "A1", "A1o", "S2").
-        src_nc: Path to the source NetCDF file.
-        out_dir: Directory to save the output NetCDF file.
-        out_nc: Name of the output NetCDF file.
+        model: Model identifier (e.g. "A1", "S2o", "N1").
+        src_nc: Path to source NetCDF file.
+        out_nc: Path to output NetCDF file.
+        pr_name: Source precipitation variable name.
+        tas_name: Source temperature variable name.
     """
+    dom = DOMAIN[model[0]]
+    tpl_pr_nc, tpl_ta_nc = f"./templates/pr_{dom}.nc", f"./templates/tasmax_{dom}.nc"
 
-    domain = DOMAIN[model[0]]
-    spatial_dims = SPATIAL_DIMS[domain]
-    templates = {
-        "pr": xr.open_dataset(f"./templates/pr_{domain}.nc"),
-        "tasmax": xr.open_dataset(f"./templates/tasmax_{domain}.nc"),
-    }
+    with xr.open_dataset(tpl_pr_nc) as tpl_pr, \
+         xr.open_dataset(tpl_ta_nc) as tpl_ta, \
+         xr.open_dataset(src_nc, group="/") as root, \
+         xr.open_dataset(src_nc, group="prediction") as pred:
 
-    with xr.open_dataset(src_nc, group="prediction") as pred_ds, \
-         xr.open_dataset(out_dir + "/" + out_nc) as input_ds:
-        # Keep first 5 ensemble members only and ensure spatial dims in correct order
-        pred = (
-            pred_ds.isel(ensemble=slice(0, 5))
-            .rename(ensemble="member")
-            .transpose("time", *spatial_dims, "member")
+        # --- Build new root (grid/time standardized to template) ---
+        out_root = replace_grid(root.copy(deep=False), tpl_pr)
+        out_root = replace_grid(out_root, tpl_ta)
+
+        # --- Build new prediction group dataset (preserve first 5 ensembles, add/rename vars) ---
+        out_pred = (
+            pred.isel(ensemble=slice(0, 5))
+            .copy(deep=False)
+            .rename({"ensemble": "member"})
         )
 
-        out = xr.Dataset(coords={"time": input_ds.time})
-        for var, src_var in {
-            "pr": "precipitation",
-            "tasmax": "max_surface_temperature",
-        }.items():
-            tpl = templates[var]
-            mean, scale = mean_n_scale(model, var)
-
-            # Rename the variable and denormalize it if APPLY_DENORM is True
-            da = pred[src_var].astype(np.float32).rename(var)
-            if APPLY_DENORM:
-                da = da * scale + mean
-
-            # Add the coordinate information from the input
-            da = da.assign_coords(
-                time=input_ds.time,
-                **{
-                    dim: tpl[dim]
-                    for dim in spatial_dims
-                }
+        for var, src_name, tpl in [
+            ("pr", pr_name, tpl_pr["pr"]),
+            ("tasmax", tas_name, tpl_ta["tasmax"]),
+        ]:
+            out_pred[var] = make_var(
+                out_pred[src_name], var, tpl, out_root, *mean_n_scale(model, var)
             )
-            da.attrs = dict(tpl[var].attrs)
 
-            out[var] = da
+        out_pred = out_pred.drop_vars([pr_name, tas_name])
 
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        out.to_netcdf(Path(out_dir) / out_nc)
+        # --- Write output ---
+        out_pred.to_netcdf(out_nc, mode="w")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python convert_nc.py <model> <src.nc> <out_dir> <out.nc>")
+    if len(sys.argv) != 4:
+        print("Usage: python convert_nc.py <model> <src.nc> <out.nc>")
         sys.exit(1)
 
-    convert(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    convert(sys.argv[1], sys.argv[2], sys.argv[3])
