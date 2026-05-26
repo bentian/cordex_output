@@ -97,6 +97,7 @@ def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Pa
 def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
     """Compute precipitation diagnostics metrics and save to plots."""
 
+    psd0, psd1 = diagnostics.psd(x0, x1, var="pr")
     metrics = {
         "rmse": lambda: diagnostics.rmse(
             x0, x1, var="pr", dim="time"
@@ -114,13 +115,13 @@ def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
             x0, x1, index_fn=indices.cwd, var="pr"
         ),
 
-        "ralsd_pr": lambda: diagnostics.ralsd(
-            *diagnostics.psd(x0, x1, var="pr")
-        ),
+        "psd_target": lambda: psd0,
+        "psd_pred": lambda: psd1,
+        "ralsd": lambda: diagnostics.ralsd(psd0, psd1),
 
-        # "wd_pr": lambda: diagnostics.wasserstein_distance(
-        #     x0, x1, var="pr", season="summer"
-        # ),
+        "wd_pr": lambda: diagnostics.wasserstein_distance(
+            x0, x1, var="pr", season="summer"
+        ),
     }
 
     print("\n=== PR Metrics ===")
@@ -136,6 +137,7 @@ def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
 def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
     """Compute tasmax diagnostics metrics and save to plots."""
 
+    psd0, psd1 = diagnostics.psd(x0, x1, var="tasmax")
     metrics = {
         "rmse": lambda: diagnostics.rmse(
             x0, x1, var="tasmax", dim="time"
@@ -153,9 +155,9 @@ def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> Non
             x0, x1, index_fn=indices.su, var="tasmax"
         ),
 
-        "ralsd_tasmax": lambda: diagnostics.ralsd(
-            *diagnostics.psd(x0, x1, var="tasmax")
-        ),
+        "psd_target": lambda: psd0,
+        "psd_pred": lambda: psd1,
+        "ralsd": lambda: diagnostics.ralsd(psd0, psd1),
 
         "wd_scalar": lambda: diagnostics.wasserstein_distance(
             x0, x1, var="tasmax"
