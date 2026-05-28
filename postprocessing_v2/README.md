@@ -17,7 +17,7 @@ and to integrate smoothly with automated submission workflows.
 - `numpy`
 - `xarray`
 - `netCDF4`
-- Bash (for `copy-predictions.sh`)g
+- Bash (for `copy-predictions.sh`)
 
 Example installation:
 ```
@@ -103,6 +103,7 @@ Example:
 - Expects raw predictions named `output_0_all.nc`
 - Automatically skips missing inputs
 - Prints `[OK]` or `[SKIP]` status per file
+
 
 ### Typical Workflow
 1. Generate raw predictions from ML models (`output_0_all.nc`)
