@@ -1,20 +1,73 @@
 """
-Compute the evaluation metrics for CORDEX.
+Compute and visualize CORDEX evaluation metrics.
 
-Usage:
-    python cordex_metrics.py <target_path> <prediction_path>
+This script compares a target/reference dataset against a prediction dataset
+and saves diagnostic metrics as PNG figures.
 
-Example:
-    python cordex_metrics.py /path/to/target /path/to/prediction
+## Metrics computed
 
-Metrics computed:
-    - RMSE
-    - Bias SDII
-    - Bias RX1DAY
-    - Bias CWD
-    - RALSD
-    - Wasserstein distance
+Precipitation (pr):
+- RMSE
+- Bias SDII (Simple Daily Intensity Index)
+- Bias RX1DAY (Annual Maximum 1-Day Precipitation)
+- Bias CWD (Consecutive Wet Days)
+- Power Spectral Density (target and prediction)
+- RALSD (Radially Averaged Log Spectral Distance)
+- Wasserstein Distance (summer precipitation distribution)
+
+Maximum Temperature (tasmax):
+- RMSE
+- Bias TXX (Annual Maximum Temperature)
+- Bias Mean Temperature
+- Bias Summer Days
+- Power Spectral Density (target and prediction)
+- RALSD (Radially Averaged Log Spectral Distance)
+- Wasserstein Distance (scalar and spatial)
+
+Multivariable:
+- Temperature-Precipitation Correlation Bias
+
+## Outputs
+
+PNG figures are written to the specified output directory:
+
+```
+pr_rmse.png
+pr_bias_sdii.png
+...
+tasmax_rmse.png
+...
+correlation_bias.png
+```
+
+## Usage
+
+```
+python cordex_metrics.py <target.nc> <prediction.nc>
+```
+
+Optional arguments:
+--output-dir <path>
+Directory for output PNG figures
+(default: metrics_plots)
+
+## Example
+
+```
+python cordex_metrics.py \
+    target.nc \
+    prediction.nc \
+    --output-dir metrics
+```
+
+## Notes
+
+* The prediction dataset is averaged across the 'member' dimension before metric computation.
+* Metrics returning higher-dimensional outputs are automatically reduced
+  to two dimensions for visualization.
+* Set DEBUG=True to evaluate only the first 10 timesteps.
 """
+
 
 import argparse
 from pathlib import Path
@@ -33,16 +86,8 @@ def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Pa
     # Convert Dataset -> DataArray
     if isinstance(metric, xr.Dataset):
         if len(metric.data_vars) == 0:
-            plt.text(
-                0.5,
-                0.5,
-                "Empty Dataset",
-                ha="center",
-                va="center",
-                fontsize=16,
-            )
+            plt.text(0.5, 0.5, "Empty Dataset", ha="center", va="center", fontsize=16)
             plt.axis("off")
-
         else:
             metric = next(iter(metric.data_vars.values()))
 
@@ -51,23 +96,11 @@ def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Pa
         # Scalar
         if metric.ndim == 0:
             value = float(metric.values)
-
-            plt.text(
-                0.5,
-                0.5,
-                f"{value:.4f}",
-                ha="center",
-                va="center",
-                fontsize=20,
-            )
+            plt.text(0.5, 0.5, f"{value:.4f}", ha="center", va="center", fontsize=20)
             plt.axis("off")
 
-        # 1D line plot
-        elif metric.ndim == 1:
-            metric.plot()
-
-        # 2D map/image
-        elif metric.ndim == 2:
+        # 1D line plot or 2D map/image
+        elif metric.ndim == 1 or metric.ndim == 2:
             metric.plot()
 
         # Higher dimensions -> average extra dims
@@ -76,14 +109,7 @@ def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Pa
             metric.mean(dim=dims_to_mean).plot()
     else:
         # Plain scalar
-        plt.text(
-            0.5,
-            0.5,
-            f"{float(metric):.4f}",
-            ha="center",
-            va="center",
-            fontsize=20,
-        )
+        plt.text(0.5, 0.5, f"{float(metric):.4f}", ha="center", va="center", fontsize=20)
         plt.axis("off")
 
     plt.title(title)
@@ -126,12 +152,7 @@ def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
 
     print("\n=== PR Metrics ===")
     for name, fn in metrics.items():
-        metric = fn()
-        save_metric_plot(
-            metric,
-            title=name,
-            filename=output_dir / f"pr_{name}.png",
-        )
+        save_metric_plot(fn(), title=name, filename=output_dir / "pr" / f"{name}.png")
 
 
 def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
@@ -170,12 +191,7 @@ def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> Non
 
     print("\n=== TASMAX Metrics ===")
     for name, fn in metrics.items():
-        metric = fn()
-        save_metric_plot(
-            metric,
-            title=name,
-            filename=output_dir / f"tasmax_{name}.png",
-        )
+        save_metric_plot(fn(), title=name, filename=output_dir / "tasmax" / f"{name}.png")
 
 
 def plot_correlation_bias(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
@@ -209,7 +225,8 @@ def main():
 
     # Create output folder
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    for d in ["pr", "tasmax"]:
+        (output_dir / d).mkdir(parents=True, exist_ok=True)
 
     # Compute metrics and save to plots
     plot_pr_metrics(x0, x1, output_dir)
