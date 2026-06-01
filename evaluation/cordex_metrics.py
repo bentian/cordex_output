@@ -32,10 +32,10 @@ Multivariable:
 PNG figures are written to the specified output directory:
 
 ```
-pr_rmse.png
-pr_bias_sdii.png
+pr/rmse.png
+pr/bias_sdii.png
 ...
-tasmax_rmse.png
+tasmax/rmse.png
 ...
 correlation_bias.png
 ```
@@ -46,10 +46,8 @@ correlation_bias.png
 python cordex_metrics.py <target.nc> <prediction.nc>
 ```
 
-Optional arguments:
---output-dir <path>
-Directory for output PNG figures
-(default: metrics_plots)
+Optional arguments: --output-dir <path>
+                    Directory for output PNG figures (default: metrics_plots)
 
 ## Example
 
