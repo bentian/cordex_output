@@ -120,86 +120,84 @@ def save_metric_plot(metric: xr.DataArray | xr.Dataset, title: str, filename: Pa
     print(f"Saved: {filename}")
 
 
-def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+def plot_pr_metrics(target_ds: xr.Dataset, pred_ds: xr.Dataset, output_dir: Path) -> None:
     """Compute precipitation diagnostics metrics and save to plots."""
 
-    psd0, psd1 = diagnostics.psd(x0, x1, var="pr")
+    psd_target, psd_pred = diagnostics.psd(target_ds, pred_ds, var="pr")
     metrics = {
         "rmse": lambda: diagnostics.rmse(
-            x0, x1, var="pr", dim="time"
+            target_ds, pred_ds, var="pr", dim="time"
         ),
 
         "bias_sdii": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.sdii, var="pr"
+            target_ds, pred_ds, index_fn=indices.sdii, var="pr"
         ),
 
         "bias_rx1day": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.rx1day, var="pr"
+            target_ds, pred_ds, index_fn=indices.rx1day, var="pr"
         ),
 
         "bias_cwd": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.cwd, var="pr"
+            target_ds, pred_ds, index_fn=indices.cwd, var="pr"
         ),
 
-        "psd_target": lambda: psd0,
-        "psd_pred": lambda: psd1,
-        "ralsd": lambda: diagnostics.ralsd(psd0, psd1),
+        "psd_target": lambda: psd_target,
+        "psd_pred": lambda: psd_pred,
+        "ralsd": lambda: diagnostics.ralsd(psd_target, psd_pred),
 
         "wd_pr": lambda: diagnostics.wasserstein_distance(
-            x0, x1, var="pr", season="summer"
+            target_ds, pred_ds, var="pr", season="summer"
         ),
     }
 
-    print("\n=== PR Metrics ===")
     for name, fn in metrics.items():
         save_metric_plot(fn(), title=name, filename=output_dir / f"{name}.png")
 
 
-def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+def plot_tasmax_metrics(target_ds: xr.Dataset, pred_ds: xr.Dataset, output_dir: Path) -> None:
     """Compute tasmax diagnostics metrics and save to plots."""
 
-    psd0, psd1 = diagnostics.psd(x0, x1, var="tasmax")
+    psd_target, psd_pred = diagnostics.psd(target_ds, pred_ds, var="tasmax")
     metrics = {
         "rmse": lambda: diagnostics.rmse(
-            x0, x1, var="tasmax", dim="time"
+            target_ds, pred_ds, var="tasmax", dim="time"
         ),
 
         "bias_txx": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.txx, var="tasmax"
+            target_ds, pred_ds, index_fn=indices.txx, var="tasmax"
         ),
 
         "bias_mean": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.mean, var="tasmax"
+            target_ds, pred_ds, index_fn=indices.mean, var="tasmax"
         ),
 
         "bias_summer_days": lambda: diagnostics.bias_index(
-            x0, x1, index_fn=indices.su, var="tasmax"
+            target_ds, pred_ds, index_fn=indices.su, var="tasmax"
         ),
 
-        "psd_target": lambda: psd0,
-        "psd_pred": lambda: psd1,
-        "ralsd": lambda: diagnostics.ralsd(psd0, psd1),
+        "psd_target": lambda: psd_target,
+        "psd_pred": lambda: psd_pred,
+        "ralsd": lambda: diagnostics.ralsd(psd_target, psd_pred),
 
         "wd_scalar": lambda: diagnostics.wasserstein_distance(
-            x0, x1, var="tasmax"
+            target_ds, pred_ds, var="tasmax"
         ),
 
         "wd_field": lambda: diagnostics.wasserstein_distance(
-            x0, x1, var="tasmax", spatial=True
+            target_ds, pred_ds, var="tasmax", spatial=True
         ),
     }
 
-    print("\n=== TASMAX Metrics ===")
     for name, fn in metrics.items():
         save_metric_plot(fn(), title=name, filename=output_dir / f"{name}.png")
 
 
-def plot_correlation_bias(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
+def plot_correlation_bias(target_ds: xr.Dataset, pred_ds: xr.Dataset, output_dir: Path) -> None:
     """Compute correlation bias between temperature and precipitation and save to plot."""
-
-    print("\n=== Correlation Bias ===")
     save_metric_plot(
-        diagnostics.bias_multivariable_correlation(x0, x1, var_x="tasmax", var_y="pr"),
+        diagnostics.bias_multivariable_correlation(
+            target_ds, pred_ds, var_x="tasmax", var_y="pr"
+        ),
         title="Correlation Bias",
         filename=output_dir / "correlation_bias.png",
     )
@@ -208,8 +206,8 @@ def plot_correlation_bias(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> N
 def main():
     """ Compute pr & tasmax diagnostics metrics. """
     parser = argparse.ArgumentParser(description="Compute pr & tasmax diagnostics metrics.")
-    parser.add_argument("target", help="Path to target/reference folder")
-    parser.add_argument("prediction", help="Path to prediction folder")
+    parser.add_argument("target", help="Path to target NetCDF file")
+    parser.add_argument("prediction", help="Path to prediction NetCDF file")
     parser.add_argument(
         "--output-dir",
         default="metrics_plots",
@@ -218,11 +216,14 @@ def main():
     args = parser.parse_args()
 
     # Get target and prediction datasets
-    x0 = xr.open_dataset(args.target)
-    # x0 = x0.sel(time=~((x0["time"].dt.month == 2) & (x0["time"].dt.day == 29)))
-    x1 = xr.open_dataset(args.prediction).mean("member")
+    target_ds = xr.open_dataset(args.target)
+    pred_ds = xr.open_dataset(args.prediction).mean("member")
+
+    # target_ds = target_ds.sel(
+    #     time=~((target_ds.time.dt.month == 2) & (target_ds.time.dt.day == 29))
+    # )
     if DEBUG:
-        x0, x1 = x0.isel(time=slice(0, 10)), x1.isel(time=slice(0, 10))
+        target_ds, pred_ds = target_ds.isel(time=slice(0, 10)), pred_ds.isel(time=slice(0, 10))
 
     # Create output folder
     output_dir = Path(args.output_dir)
@@ -230,9 +231,9 @@ def main():
         (output_dir / d).mkdir(parents=True, exist_ok=True)
 
     # Compute metrics and save to plots
-    plot_pr_metrics(x0, x1, output_dir / "pr")
-    plot_tasmax_metrics(x0, x1, output_dir / "tasmax")
-    plot_correlation_bias(x0, x1, output_dir)
+    plot_pr_metrics(target_ds, pred_ds, output_dir / "pr")
+    plot_tasmax_metrics(target_ds, pred_ds, output_dir / "tasmax")
+    plot_correlation_bias(target_ds, pred_ds, output_dir)
 
     print(f"\nAll plots saved to: {output_dir.resolve()}")
 
