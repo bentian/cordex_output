@@ -152,7 +152,7 @@ def plot_pr_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
 
     print("\n=== PR Metrics ===")
     for name, fn in metrics.items():
-        save_metric_plot(fn(), title=name, filename=output_dir / "pr" / f"{name}.png")
+        save_metric_plot(fn(), title=name, filename=output_dir / f"{name}.png")
 
 
 def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
@@ -191,7 +191,7 @@ def plot_tasmax_metrics(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> Non
 
     print("\n=== TASMAX Metrics ===")
     for name, fn in metrics.items():
-        save_metric_plot(fn(), title=name, filename=output_dir / "tasmax" / f"{name}.png")
+        save_metric_plot(fn(), title=name, filename=output_dir / f"{name}.png")
 
 
 def plot_correlation_bias(x0: xr.Dataset, x1: xr.Dataset, output_dir: Path) -> None:
@@ -219,6 +219,7 @@ def main():
 
     # Get target and prediction datasets
     x0 = xr.open_dataset(args.target)
+    # x0 = x0.sel(time=~((x0["time"].dt.month == 2) & (x0["time"].dt.day == 29)))
     x1 = xr.open_dataset(args.prediction).mean("member")
     if DEBUG:
         x0, x1 = x0.isel(time=slice(0, 10)), x1.isel(time=slice(0, 10))
@@ -229,8 +230,8 @@ def main():
         (output_dir / d).mkdir(parents=True, exist_ok=True)
 
     # Compute metrics and save to plots
-    plot_pr_metrics(x0, x1, output_dir)
-    plot_tasmax_metrics(x0, x1, output_dir)
+    plot_pr_metrics(x0, x1, output_dir / "pr")
+    plot_tasmax_metrics(x0, x1, output_dir / "tasmax")
     plot_correlation_bias(x0, x1, output_dir)
 
     print(f"\nAll plots saved to: {output_dir.resolve()}")
