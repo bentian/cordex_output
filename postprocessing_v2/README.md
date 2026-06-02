@@ -97,6 +97,13 @@ Templates provide:
 The `./data/templates/` directory is copied from the official
 [CORDEX ML-Benchmark repository](https://github.com/WCRP-CORDEX/ml-benchmark/tree/main/format_predictions/templates).
 
+### Skip Applying Denormalization
+
+To skip applying denormalization, set `APPLY_DENORM = False` in `convert_nc.py`:
+```
+APPLY_DENORM = False
+```
+
 ## `copy-predictions.sh`
 
 ### Purpose
