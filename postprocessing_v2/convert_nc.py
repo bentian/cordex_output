@@ -25,6 +25,7 @@ Example:
         reference.nc \
         output.nc
 """
+
 from pathlib import Path
 import sys
 import numpy as np
@@ -58,18 +59,14 @@ SCALE = {
     "N2": {"pr": 9.727775223067006, "tasmax": 4.607882022857666},
 }
 
+
 def mean_n_scale(model: str, var: str) -> tuple[float, float]:
     """Return mean and scale for a model/variable pair."""
     m = model.rstrip("o")
     return MEAN[m][var], SCALE[m][var]
 
 
-def convert(
-    model: str,
-    src_nc: str,
-    ref_nc: str,
-    out_nc: str
-) -> None:
+def convert(model: str, src_nc: str, ref_nc: str, out_nc: str) -> None:
     """
     Convert CORDEX-style prediction NetCDF files into benchmark-compliant format.
 
@@ -82,16 +79,18 @@ def convert(
 
     domain, spatial_dims = DOMAIN_INFO[model[0]]
     templates = {
-        var: xr.open_dataset(f"../data/templates/{var}_{domain}.nc")
-        for var in VAR_MAP
+        var: xr.open_dataset(f"../data/templates/{var}_{domain}.nc") for var in VAR_MAP
     }
 
-    with xr.open_dataset(src_nc, group="prediction") as pred_ds, \
-         xr.open_dataset(ref_nc) as ref_ds:
-
+    with (
+        xr.open_dataset(src_nc, group="prediction") as pred_ds,
+        xr.open_dataset(ref_nc) as ref_ds,
+    ):
         # Check whether time dimension length matches
         if pred_ds.sizes["time"] != ref_ds.sizes["time"]:
-            raise ValueError("Time dimension length mismatch between prediction and reference")
+            raise ValueError(
+                "Time dimension length mismatch between prediction and reference"
+            )
 
         # Keep first 5 ensemble members only and ensure spatial dims in correct order
         pred_ds = (
@@ -122,7 +121,8 @@ def convert(
                 mean, scale = mean_n_scale(model, var)
                 da = da * scale + mean
 
-            out[var] = da
+            # Clip negative pr to 0
+            out[var] = da.clip(min=0) if var == "pr" else da
 
         Path(out_nc).parent.mkdir(parents=True, exist_ok=True)
         out.to_netcdf(out_nc)

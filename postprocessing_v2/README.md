@@ -100,7 +100,7 @@ The `./data/templates/` directory is copied from the official
 ### Skip Applying Denormalization
 
 To skip applying denormalization, set `APPLY_DENORM = False` in `convert_nc.py`:
-```
+```python
 APPLY_DENORM = False
 ```
 
