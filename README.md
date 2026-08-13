@@ -17,7 +17,7 @@ and to integrate smoothly with automated submission workflows.
 - `numpy`
 - `xarray`
 - `netCDF4`
-- Bash (for `copy-predictions.sh`)g
+- Bash (for `copy-predictions.sh`)
 
 Example installation:
 ```
@@ -27,7 +27,7 @@ pip install numpy xarray netCDF4
 ## `convert_nc.py`
 
 ### Purpose
-Convert raw ML prediction NetCDF files into the __C__ORDEX ML-Benchmark submission format__ by:
+Convert raw ML prediction NetCDF files into the __CORDEX ML-Benchmark submission format__ by:
 - Selecting the first 5 ensemble members
 - Renaming `ensemble → member`
 - Renaming variables:
